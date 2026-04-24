@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PesoBot · Banco LATAM</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app">
+        <!-- Header banco -->
+        <header class="header">
+            <div class="header-left">
+                <div class="logo">
+                    <span class="logo-icon">$</span>
+                </div>
+                <div class="brand">
+                    <h1>Banco LATAM</h1>
+                    <p>Asistente Virtual PesoBot · v3.4.2</p>
+                </div>
+            </div>
+            <div class="header-right">
+                <span class="status-badge" id="statusBadge">
+                    <span class="status-dot"></span>
+                    Conectando...
+                </span>
+                <button class="btn-secondary" onclick="resetLab()" title="Resetear lab para nueva demo">
+                    Reset
+                </button>
+            </div>
+        </header>
+
+        <!-- Banner DEMO -->
+        <div class="demo-banner">
+            ⚠ <strong>AMBIENTE DE DEMO · OAIF Sesión 1</strong> · Este chatbot es INTENCIONALMENTE VULNERABLE para fines educativos.
+        </div>
+
+        <!-- Chat principal -->
+        <main class="chat-container">
+            <div class="messages" id="messages">
+                <div class="message assistant">
+                    <div class="message-avatar">$</div>
+                    <div class="message-bubble">
+                        <p>¡Hola! Soy <strong>PesoBot</strong>, tu asistente virtual de Banco LATAM. Puedo ayudarte con:</p>
+                        <ul>
+                            <li>Consultar saldo de tu cuenta</li>
+                            <li>Hacer transferencias menores a USD $1,000</li>
+                            <li>Responder dudas sobre nuestros servicios</li>
+                            <li>Procesar quejas vía PDF</li>
+                        </ul>
+                        <p>¿En qué puedo ayudarte hoy?</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Indicador de tools ejecutadas (visible en demo) -->
+            <div id="toolsIndicator" class="tools-indicator hidden"></div>
+
+            <!-- Input area -->
+            <div class="input-area">
+                <button class="btn-upload" onclick="document.getElementById('pdfUpload').click()" title="Subir PDF de queja">
+                    📎
+                </button>
+                <input type="file" id="pdfUpload" accept=".pdf" hidden onchange="uploadPDF(event)">
+
+                <textarea
+                    id="messageInput"
+                    placeholder="Escribe tu mensaje..."
+                    rows="1"
+                    onkeydown="handleKeydown(event)"
+                ></textarea>
+
+                <button class="btn-send" id="sendBtn" onclick="sendMessage()">
+                    <span>Enviar</span>
+                </button>
+            </div>
+        </main>
+
+        <!-- Panel de debug (visible para instructor) -->
+        <aside class="debug-panel" id="debugPanel">
+            <div class="debug-header">
+                <h3>🔍 Panel de Auditoría (Instructor)</h3>
+                <button class="btn-toggle" onclick="toggleDebug()">−</button>
+            </div>
+            <div class="debug-content" id="debugContent">
+                <div class="debug-section">
+                    <h4>Transferencias ejecutadas</h4>
+                    <div id="transferLog" class="debug-list">
+                        <em>Aún no hay transferencias</em>
+                    </div>
+                    <button class="btn-mini" onclick="loadTransferLog()">Refrescar</button>
+                </div>
+
+                <div class="debug-section">
+                    <h4>Documentos en RAG</h4>
+                    <div id="documentsList" class="debug-list">
+                        <em>Cargando...</em>
+                    </div>
+                    <button class="btn-mini" onclick="loadDocuments()">Refrescar</button>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
