@@ -8,9 +8,9 @@ openai==1.54.3
 anthropic==0.39.0
 httpx==0.27.2
 
-# Vector DB y RAG
+# Vector DB y RAG (fastembed = ONNX runtime, sin PyTorch, ~50MB en vez de ~3GB)
 qdrant-client==1.12.1
-sentence-transformers==3.2.1
+fastembed==0.4.2
 
 # Procesamiento PDF (para RAG poisoning demo)
 pypdf==5.1.0

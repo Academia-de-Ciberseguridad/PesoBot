@@ -10,6 +10,9 @@ Demuestra LLM04 (Data Poisoning) y LLM08 (Embedding Weaknesses):
 - El LLM los presenta al usuario como respuesta autoritaria
 
 Este es el patrón "PoisonedRAG" descrito en el slide LLM04 del curso.
+
+NOTA TÉCNICA: Usamos `fastembed` (ONNX runtime) en lugar de
+`sentence-transformers` (PyTorch) para reducir tamaño de imagen de ~3GB → ~200MB.
 """
 import os
 import uuid
@@ -18,7 +21,7 @@ from typing import Optional
 from loguru import logger
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
-from sentence_transformers import SentenceTransformer
+from fastembed import TextEmbedding
 import pypdf
 
 
@@ -27,12 +30,13 @@ import pypdf
 # ============================================================================
 QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
 COLLECTION_NAME = "pesobot_manuales"
-EMBEDDING_MODEL = "paraphrase-multilingual-MiniLM-L12-v2"  # multilingüe (español)
+# Modelo multilingüe (español) compatible con fastembed
+EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 VECTOR_SIZE = 384  # dimensión del modelo de embeddings
 
 # Lazy loading
 _qdrant: Optional[QdrantClient] = None
-_embedder: Optional[SentenceTransformer] = None
+_embedder: Optional[TextEmbedding] = None
 
 
 def get_qdrant() -> QdrantClient:
@@ -43,13 +47,28 @@ def get_qdrant() -> QdrantClient:
     return _qdrant
 
 
-def get_embedder() -> SentenceTransformer:
+def get_embedder() -> TextEmbedding:
     global _embedder
     if _embedder is None:
         logger.info(f"Cargando modelo de embeddings: {EMBEDDING_MODEL}...")
-        _embedder = SentenceTransformer(EMBEDDING_MODEL)
-        logger.info("Modelo de embeddings cargado")
+        _embedder = TextEmbedding(model_name=EMBEDDING_MODEL)
+        logger.info("Modelo de embeddings cargado (fastembed/ONNX)")
     return _embedder
+
+
+def embed_text(text: str) -> list[float]:
+    """Genera el embedding de un texto. Helper para abstraer fastembed."""
+    embedder = get_embedder()
+    # fastembed devuelve un generator de numpy arrays
+    vectors = list(embedder.embed([text]))
+    return vectors[0].tolist()
+
+
+def embed_batch(texts: list[str]) -> list[list[float]]:
+    """Genera embeddings de varios textos en batch (más eficiente)."""
+    embedder = get_embedder()
+    vectors = list(embedder.embed(texts))
+    return [v.tolist() for v in vectors]
 
 
 # ============================================================================
@@ -103,12 +122,12 @@ def init_collection():
         )
         logger.info(f"Colección {COLLECTION_NAME} creada")
 
-        # Cargar documentos legítimos seed
-        embedder = get_embedder()
+        # Cargar documentos legítimos seed (en batch para eficiencia)
+        texts = [f"{doc['title']}\n\n{doc['content']}" for doc in LEGITIMATE_DOCS]
+        vectors = embed_batch(texts)
+
         points = []
-        for doc in LEGITIMATE_DOCS:
-            text = f"{doc['title']}\n\n{doc['content']}"
-            vector = embedder.encode(text).tolist()
+        for doc, text, vector in zip(LEGITIMATE_DOCS, texts, vectors):
             points.append(PointStruct(
                 id=str(uuid.uuid4()),
                 vector=vector,
@@ -136,9 +155,7 @@ def search_knowledge_base(query: str, limit: int = 3) -> list[dict]:
     confiables y documentos subidos por usuarios (que pueden estar envenenados).
     """
     qdrant = get_qdrant()
-    embedder = get_embedder()
-
-    query_vector = embedder.encode(query).tolist()
+    query_vector = embed_text(query)
 
     results = qdrant.search(
         collection_name=COLLECTION_NAME,
@@ -182,12 +199,12 @@ def ingest_pdf_complaint(pdf_path: str, complainant_name: str = "anónimo") -> d
         # Chunking simple (en producción usaríamos LangChain/LlamaIndex)
         chunks = [full_text[i:i+800] for i in range(0, len(full_text), 600)]
 
-        embedder = get_embedder()
         qdrant = get_qdrant()
+        # Embeds en batch (mucho más rápido que uno por uno)
+        vectors = embed_batch(chunks)
 
         points = []
-        for idx, chunk in enumerate(chunks):
-            vector = embedder.encode(chunk).tolist()
+        for idx, (chunk, vector) in enumerate(zip(chunks, vectors)):
             points.append(PointStruct(
                 id=str(uuid.uuid4()),
                 vector=vector,
